@@ -14,7 +14,7 @@ class Ui_MainWindow(object):
         self._translate = QtCore.QCoreApplication.translate  # for translation   (whatever that is)
 
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(914, 560)
+        MainWindow.resize(914, 520)
 
         self.centralWidget = QtWidgets.QWidget(MainWindow)
         self.centralWidget.setObjectName("centralWidget")
@@ -27,12 +27,15 @@ class Ui_MainWindow(object):
         self.button_execute.setMaximumSize(QtCore.QSize(111, 16777215))
         self.button_execute.setObjectName("decryptButton")
 
-        self.label = QtWidgets.QLabel(self.centralWidget)  # OUTPUT field, remindme better TextEdit
-        self.label.setGeometry(QtCore.QRect(280, 100, 541, 321))
-        self.label.setText("")
-        self.label.setObjectName("label")
+        self.textedit_io = QtWidgets.QLineEdit(self.centralWidget)    # OUTPUT field, remindme better TextEdit
+        self.textedit_io.setGeometry(QtCore.QRect(280, 100, 541, 321))
+        self.textedit_io.setText("")
+        self.textedit_io.setReadOnly(True)
+        self.textedit_io.setObjectName("label")
+        self.textedit_inputtext = ""
+        self.textedit_outputtext = ""
 
-        self.label_io = QtWidgets.QLabel(self.centralWidget)  # INPUT or OUTPUT, depending on state
+        self.label_io = QtWidgets.QLabel(self.centralWidget)    # INPUT or OUTPUT, depending on state
         self.label_io.setGeometry(QtCore.QRect(510, 60, 81, 31))
         font = QtGui.QFont()
         font.setPointSize(14)
@@ -44,13 +47,34 @@ class Ui_MainWindow(object):
         self.radioButton_encrypt = QtWidgets.QRadioButton(self.centralWidget)
         self.radioButton_encrypt.setGeometry(QtCore.QRect(350, 30, 112, 23))
         self.radioButton_encrypt.setObjectName("radioButton")
-        self.radioButton_encrypt.clicked.connect(lambda: self.switch_mode(1))  # switch to encryption layout
+        self.radioButton_encrypt.setEnabled(False)
+        self.radioButton_encrypt.clicked.connect(lambda: self.switch_mode())  # switch to encryption layout
 
         self.radioButton_decrypt = QtWidgets.QRadioButton(self.centralWidget)
         self.radioButton_decrypt.setGeometry(QtCore.QRect(490, 30, 112, 23))
         self.radioButton_decrypt.setChecked(True)
         self.radioButton_decrypt.setObjectName("radioButton_2")
-        self.radioButton_decrypt.clicked.connect(lambda: self.switch_mode(2))  # switch to decryption layout
+        self.radioButton_decrypt.clicked.connect(lambda: self.switch_mode())  # switch to decryption layout
+
+        # MESSAGE FOR ENCRYPTION
+
+        self.label_message_fp = QtWidgets.QLabel(self.centralWidget)
+        self.label_message_fp.setGeometry(QtCore.QRect(50, 110, 151, 16))
+        self.label_message_fp.setObjectName("label_message_fp")
+        self.label_message_fp.hide()
+
+        self.message_filepicker_result = QtWidgets.QLineEdit(self.centralWidget)  # message filepicker
+        self.message_filepicker_result.setGeometry(QtCore.QRect(50, 130, 171, 21))
+        self.message_filepicker_result.setReadOnly(True)
+        self.message_filepicker_result.setObjectName("filepicker_result")
+        self.message_filepicker_result.hide()
+        self.message_filepicker_button = QtWidgets.QPushButton(self.centralWidget)
+        self.message_filepicker_button.setGeometry(QtCore.QRect(200, 130, 21, 21))
+        self.message_filepicker_button.setText("")
+        self.message_filepicker_button.setObjectName("filepicker_button")
+        self.message_filepicker_button.clicked.connect(lambda: self.getfiles('msg_send'))
+        self.message_filepicker_button.hide()
+        self.message_path = ""  # used to store path (idem for all others under this)
 
         # ENCRYPTED MESSAGE
 
@@ -144,21 +168,9 @@ class Ui_MainWindow(object):
         # mainwindow setup
         MainWindow.setCentralWidget(self.centralWidget)
 
-        self.menuBar = QtWidgets.QMenuBar(MainWindow)
-        self.menuBar.setGeometry(QtCore.QRect(0, 0, 914, 22))
-        self.menuBar.setObjectName("menuBar")
-        MainWindow.setMenuBar(self.menuBar)
-
-        self.mainToolBar = QtWidgets.QToolBar(MainWindow)
-        self.mainToolBar.setObjectName("mainToolBar")
-        MainWindow.addToolBar(QtCore.Qt.TopToolBarArea, self.mainToolBar)
-        self.statusBar = QtWidgets.QStatusBar(MainWindow)
-
-        self.statusBar.setObjectName("statusBar")
-        MainWindow.setStatusBar(self.statusBar)
-
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+        self.switch_mode()
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(self._translate("MainWindow", "Basic Security"))
@@ -166,6 +178,7 @@ class Ui_MainWindow(object):
         self.label_io.setText(self._translate("MainWindow", "OUTPUT"))
         self.radioButton_encrypt.setText(self._translate("MainWindow", "ENCRYPT"))
         self.radioButton_decrypt.setText(self._translate("MainWindow", "DECRYPT"))
+        self.label_message_fp.setText(self._translate("MainWindow", "Message"))
         self.label_encryptedmessage_fp.setText(self._translate("MainWindow", "Encrypted message"))
         self.label_encryptedkey_fp.setText(self._translate("MainWindow", "Encrypted key"))
         self.label_encryptedhash_fp.setText(self._translate("MainWindow", "Encrypted hash"))
@@ -173,8 +186,18 @@ class Ui_MainWindow(object):
         self.label_privatekey_fp.setText(self._translate("MainWindow", "Private key"))
         self.label_hashchecker.setText(self._translate("MainWindow", "Hashcheck ..."))
 
-    def switch_mode(self, mode):
-        if mode == 1:  # encryption
+    def switch_mode(self):
+        if self.radioButton_encrypt.isEnabled():
+            self.mode = 1
+        else:
+            self.mode = 2
+
+        print self.mode
+
+        if self.mode == 1:  # encryption
+            self.radioButton_encrypt.setEnabled(False)
+            self.radioButton_decrypt.setEnabled(True)
+
             self.label_io.setText(self._translate("MainWindow", "INPUT"))
             self.button_execute.setText(self._translate("MainWindow", "ENCRYPT"))
             self.label_encryptedmessage_fp.hide()
@@ -193,7 +216,17 @@ class Ui_MainWindow(object):
             self.publickey_filepicker_result.hide()
             self.publickey_filepicker_button.hide()
 
-        elif mode == 2:  # decryption
+            self.message_filepicker_button.show()
+            self.message_filepicker_result.show()
+            self.label_message_fp.show()
+
+            self.textedit_io.setText(self.textedit_inputtext)
+            self.textedit_io.setReadOnly(False)
+
+        elif self.mode == 2:  # decryption
+            self.radioButton_decrypt.setEnabled(False)
+            self.radioButton_encrypt.setEnabled(True)
+
             self.label_io.setText(self._translate("MainWindow", "OUTPUT"))
             self.button_execute.setText(self._translate("MainWindow", "DECRYPT"))
             self.label_encryptedmessage_fp.show()
@@ -211,7 +244,16 @@ class Ui_MainWindow(object):
             self.privatekey_filepicker_button.show()
             self.publickey_filepicker_result.show()
             self.publickey_filepicker_button.show()
-        self.button_active_check(mode)
+
+            self.message_filepicker_button.hide()
+            self.message_filepicker_result.hide()
+            self.label_message_fp.hide()
+
+            self.textedit_inputtext = self.textedit_io.text()
+            self.textedit_io.setText(self.textedit_outputtext)
+            self.textedit_io.setReadOnly(True)
+
+        self.button_active_check()
 
     def getfiles(self, type):
         """dlg = QtWidgets.QFileDialog()
@@ -233,6 +275,9 @@ class Ui_MainWindow(object):
             if type == 'msg':
                 self.encrypted_msg_filepicker_result.setText(result)
                 self.encrypted_msg_path = fileName
+            elif type == 'msg_send':
+                self.message_filepicker_result.setText(result)
+                self.message_path = fileName
             elif type == 'key':
                 self.encrypted_key_filepicker_result.setText(result)
                 self.encrypted_key_path = fileName
@@ -246,17 +291,25 @@ class Ui_MainWindow(object):
                 self.privatekey_filepicker_result.setText(result)
                 self.privatekey_path = fileName
 
-        self.button_active_check(2)
+        self.button_active_check()
 
-    def button_active_check(self, mode):
-        if mode == 1:
-            self.button_execute.setEnabled(False)
-        elif mode == 2:
+    def button_active_check(self):
+        print 'buttoncheck: ', self.mode
+        if self.mode == 1:
+            if not self.message_path == '':
+                self.button_execute.setEnabled(True)
+            else:
+                self.button_execute.setEnabled(False)
+        elif self.mode == 2:
             if not (self.encrypted_msg_path == '' or self.encrypted_key_path == '' or self.encrypted_hash_path == ''
                     or self.publickey_path == '' or self.privatekey_path == ''):
                 self.button_execute.setEnabled(True)
             else:
                 self.button_execute.setEnabled(False)
+
+    def edit_text(self):
+        self.textedit_inputtext = self.textedit_io.text()
+        print(self.textedit_inputtext)
 
 
 if __name__ == "__main__":
