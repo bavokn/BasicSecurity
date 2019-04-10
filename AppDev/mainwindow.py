@@ -1,16 +1,288 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'mainwindow.ui'
-#
-# Created by: PyQt5 UI code generator 5.10.1
-#
-# WARNING! All changes made in this file will be lost!
-
+import os
+import sys
+import zipfile
+from Crypto.Cipher import PKCS1_OAEP, AES
+from Crypto.Hash import SHA256
+from Crypto.PublicKey import RSA
+from Crypto.Signature import PKCS1_v1_5
 from PyQt5 import QtCore, QtGui, QtWidgets
+from Crypto import Random
+from Crypto.Random import random
+
+
+class Enchipher:
+    def __init__(self):
+        # Sender's private key:
+        self.priKey = "files/priKeyA.pem"
+        # Receiver's public key:
+        self.pubKey = "files/pubKeyB.pem"
+
+        # File name to encrypt
+        self.f_name = ""
+
+    def sigGenerator(self, priKey_fname, f_name, priPass):
+        # Opening and reading file to encrypt
+
+        f = open(f_name, "r")
+        buffer = f.read()
+        f.close()
+
+        # Creating hash of the file. Using SHA-256 (SHA-512 rose problems)
+
+        h = SHA256.new(buffer)
+
+        # Reading private key to sign file with
+
+        keyPair = RSA.importKey(open(priKey_fname, "r").read(), passphrase=priPass)
+        keySigner = PKCS1_v1_5.new(keyPair)
+
+        # Saving signature to *.sig file
+
+        f = open(f_name.split('.')[0] + ".sig", "w")
+        f.write(keySigner.sign(h))
+        f.close()
+
+    def keyGenerator(self, pubKey_fname, f_name, iv):
+        # Generating 1024 random bits, and creating SHA-256 (for 32 bits compatibility with AES)
+
+        h = SHA256.new(str(random.getrandbits(1024)))
+
+        # Reading public key to encrypt AES key with
+
+        keyPair = RSA.importKey(open(pubKey_fname, "r").read())
+        keyCipher = PKCS1_OAEP.new(keyPair.publickey())
+
+        # Saving encrypted key to *.key file
+
+        f = open(f_name.split('.')[0] + ".key", "w")
+        f.write(iv + keyCipher.encrypt(h.digest()))
+        f.close()
+
+        # Returning generated key to encrypt file with
+
+        return h.digest()
+
+    def encipher(self, keyA_fname, keyB_fname, f_name):
+        # Opening file to encrypt in binary reading mode
+
+        f = open(f_name, "rb")
+        buffer = f.read()
+        f.close()
+
+        # Generating file's signature (and saving it)
+
+        priPass = ""
+        self.sigGenerator(keyA_fname, f_name, priPass=priPass)
+
+        # Generating initializing vector for AES Encryption
+
+        iv = Random.new().read(AES.block_size)
+
+        # Generating symmetric key for use (and saving it)
+
+        k = self.keyGenerator(keyB_fname, f_name, iv)
+
+        # Encrypting and saving result to *.bin file. Using CFB mode
+
+        keyCipher = AES.new(str(k), AES.MODE_CFB, iv)
+        f = open(f_name.split('.')[0] + ".bin", "wb")
+        f.write(keyCipher.encrypt(buffer))
+        f.close()
+
+    def auxFilesZip(self, sig, key, bin):
+        # Opening file to contain all bin, sig and key files
+
+        f = zipfile.ZipFile(bin.split('.')[0] + ".all", "w")
+
+        # Writing each of the arguments to the created file
+
+        f.write(sig)
+        f.write(key)
+        f.write(bin)
+
+        # Closing the file
+
+        f.close()
+
+        # Running clean up to the bin, sig and key files
+
+        self.cleanUp(sig, key, bin)
+
+    def cleanUp(self, sig, key, bin):
+        # Deleting each of the files generated during ciphering
+
+        os.remove(sig)
+        os.remove(key)
+        os.remove(bin)
+
+    def checkFiles(self, f_name, pubKey, priKey):
+        # Checking for encrypting file's existence and access
+
+        if not os.path.isfile(f_name) or not os.access(f_name, os.R_OK):
+            print ("Invalid file to encrypt. Aborting...")
+            sys.exit(1)
+
+        # Checking for each of the files to create existence and, in case they exist, if they are writable
+
+        else:
+            s = f_name.split('.')[0]
+            if os.path.isfile(s + ".sig") and not os.access(s + ".sig", os.W_OK):
+                print "Can't create temporary file: *.bin. Aborting..."
+                sys.exit(2)
+            if os.path.isfile(s + ".key") and not os.access(s + ".key", os.W_OK):
+                print "Can't create temporary file: *.key. Aborting..."
+                sys.exit(3)
+            if os.path.isfile(s + ".bin") and not os.access(s + ".bin", os.W_OK):
+                print "Can't create temporary file: *.bin. Aborting..."
+                sys.exit(4)
+            if os.path.isfile(s + ".all") and not os.access(s + ".all", os.W_OK):
+                print "Can't create output file. Aborting..."
+                sys.exit(5)
+
+        # Checking for public key's existence and access
+
+        if not os.path.isfile(pubKey) or not os.access(pubKey, os.R_OK):
+            print "Invalid public key file. Aborting..."
+            sys.exit(6)
+
+        # Checking for private key's existence and access
+
+        if not os.path.isfile(priKey) or not os.access(priKey, os.R_OK):
+            print "Invalid private key file. Aborting..."
+            sys.exit(7)
+
+
+class Decipher:
+    def __init__(self):
+        # Define public and private key names for faster usage
+        self.pubKey = "files/pubKeyA.pem"
+        # Receiver's private key:
+        self.priKey = "files/priKeyB.pem"
+
+        # File name to decrypt
+        self.f_name = "files/encrypted_message.txt"
+
+    def sigVerification(self, pubKey_fname, f_name):
+        # Generating decrypted file's SHA-256
+
+        h = SHA256.new()
+        h.update(open(f_name, "r").read())
+
+        # Reading public key to check signature with
+
+        keyPair = RSA.importKey(open(pubKey_fname, "r").read())
+        keyVerifier = PKCS1_v1_5.new(keyPair.publickey())
+
+        # If signature is right, prints SHA-256. Otherwise states that the file is not authentic
+
+        if keyVerifier.verify(h, open(f_name.split('.')[0] + ".sig", "r").read()):
+            print("The signature is authentic.")
+            print("SHA-256 -> %s" % h.hexdigest())
+        else:
+            print("The signature is not authentic.")
+
+    def keyReader(self, privKey_fname, f_name):
+        # Reading private key to decipher symmetric key used
+
+        keyPair = RSA.importKey(open(privKey_fname, "r").read())
+        keyDecipher = PKCS1_OAEP.new(keyPair)
+
+        # Reading iv and symmetric key used during encryption
+
+        f = open(f_name.split('.')[0] + ".key", "r")
+        iv = f.read(16)
+        k = keyDecipher.decrypt(f.read())
+
+        return k, iv
+
+    def decipher(self, keyA_fname, keyB_fname, f_name):
+        # Getting symmetric key used and iv value generated at encryption process
+
+        k, iv = self.keyReader(keyB_fname, f_name)
+
+        # Deciphering the initial information and saving it to file with no extension
+
+        keyDecipher = AES.new(k, AES.MODE_CFB, iv)
+        bin = open(f_name + ".bin", "rb").read()
+        f = open(f_name.split('.')[0], "wb")
+        f.write(keyDecipher.decrypt(bin))
+        f.close()
+
+        # Running a Signature verification
+
+        self.sigVerification(keyA_fname, f_name.split('.')[0])
+
+    def auxFilesUnzip(self, all):
+        # Opening the input file
+
+        f = zipfile.ZipFile(all + ".all", "r")
+
+        # Extracting all of its files
+
+        f.extractall()
+
+    def cleanUp(self, sig, key, bin, all):
+        # Removing all of the files created, except for the final deciphered file
+
+        os.remove(sig)
+        os.remove(key)
+        os.remove(bin)
+        os.remove(all)
+
+    def checkFiles(self, f_name, pubKey, priKey, first_run):
+        # Checking for decrypting file's existence and access, keys, aux and output files
+
+        if first_run:
+            # Checking for decrypting file's existence and access
+
+            if not os.path.isfile(f_name + ".all") or not os.access(f_name + ".all", os.R_OK):
+                print("Invalid file to decrypt. Aborting...")
+                sys.exit(1)
+
+            # Checking for public key's existence and access
+
+            if not os.path.isfile(pubKey) or not os.access(pubKey, os.R_OK):
+                print("Invalid public key file. Aborting...")
+                sys.exit(6)
+
+            # Checking for private key's existence and access
+
+            if not os.path.isfile(priKey) or not os.access(priKey, os.R_OK):
+                print("Invalid private key file. Aborting...")
+                sys.exit(7)
+
+        elif not first_run:
+            # Checking if all of the necessary files exist and are accessible
+
+            if not os.path.isfile(f_name + ".sig") or not os.access(f_name + ".sig", os.R_OK):
+                print("Invalid *.sig file. Aborting...")
+                sys.exit(2)
+            if not os.path.isfile(f_name + ".key") or not os.access(f_name + ".key", os.R_OK):
+                print("Invalid *.key file. Aborting...")
+                sys.exit(3)
+            if not os.path.isfile(f_name + ".bin") or not os.access(f_name + ".bin", os.R_OK):
+                print("Invalid *.bin file. Aborting...")
+                sys.exit(4)
+
+            # Checking if in case of output file's existence, it is writable
+
+            if os.path.isfile(f_name) and not os.access(f_name, os.W_OK):
+                print("Can't create output file. Aborting...")
+                sys.exit(5)
 
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
+
+        # initialize crypto classes
+        self.decipher = Decipher()
+        self.encipher = Enchipher()
+
+        # generate the keys
+        self.generate_keys()
+
         self._translate = QtCore.QCoreApplication.translate  # for translation   (whatever that is)
 
         MainWindow.setObjectName("MainWindow")
@@ -23,11 +295,12 @@ class Ui_MainWindow(object):
 
         self.button_execute = QtWidgets.QPushButton(self.centralWidget)  # button to DECRYPT or ENCRYPT
         self.button_execute.setEnabled(False)  # depending on state
-        self.button_execute.setGeometry(QtCore.QRect(50, 410, 111, 51))  # still need to connect function
+        self.button_execute.setGeometry(QtCore.QRect(50, 410, 111, 51))
         self.button_execute.setMaximumSize(QtCore.QSize(111, 16777215))
         self.button_execute.setObjectName("decryptButton")
+        self.button_execute.clicked.connect(self.execution)
 
-        self.textedit_io = QtWidgets.QLineEdit(self.centralWidget)    # OUTPUT field, remindme better TextEdit
+        self.textedit_io = QtWidgets.QLineEdit(self.centralWidget)    # OUTPUT or INPUT field
         self.textedit_io.setGeometry(QtCore.QRect(280, 100, 541, 321))
         self.textedit_io.setText("")
         self.textedit_io.setReadOnly(True)
@@ -192,8 +465,6 @@ class Ui_MainWindow(object):
         else:
             self.mode = 2
 
-        print self.mode
-
         if self.mode == 1:  # encryption
             self.radioButton_encrypt.setEnabled(False)
             self.radioButton_decrypt.setEnabled(True)
@@ -221,7 +492,6 @@ class Ui_MainWindow(object):
             self.label_message_fp.show()
 
             self.textedit_io.setText(self.textedit_inputtext)
-            self.textedit_io.setReadOnly(False)
 
         elif self.mode == 2:  # decryption
             self.radioButton_decrypt.setEnabled(False)
@@ -251,7 +521,6 @@ class Ui_MainWindow(object):
 
             self.textedit_inputtext = self.textedit_io.text()
             self.textedit_io.setText(self.textedit_outputtext)
-            self.textedit_io.setReadOnly(True)
 
         self.button_active_check()
 
@@ -278,6 +547,9 @@ class Ui_MainWindow(object):
             elif type == 'msg_send':
                 self.message_filepicker_result.setText(result)
                 self.message_path = fileName
+                f = open(fileName, 'r')
+                input_msg = f.read()
+                self.textedit_io.setText(input_msg)
             elif type == 'key':
                 self.encrypted_key_filepicker_result.setText(result)
                 self.encrypted_key_path = fileName
@@ -293,8 +565,8 @@ class Ui_MainWindow(object):
 
         self.button_active_check()
 
+    # CHECK IF BUTTON SHOULD BE ACTIVE
     def button_active_check(self):
-        print 'buttoncheck: ', self.mode
         if self.mode == 1:
             if not self.message_path == '':
                 self.button_execute.setEnabled(True)
@@ -310,6 +582,46 @@ class Ui_MainWindow(object):
     def edit_text(self):
         self.textedit_inputtext = self.textedit_io.text()
         print(self.textedit_inputtext)
+
+    # EXECUTE ENCRYPTION OR DECRYPTION
+    def execution(self):
+        print "HA"
+        print self.message_filepicker_result.text(), self.message_path
+        if self.mode == 1:
+            self.encipher.encipher('files/priKeyA.pem', 'files/pubKeyB.pem', self.message_path)
+            print "OK"
+            self.encipher.auxFilesZip("files/" + self.message_filepicker_result.text().split('.')[0] + ".sig",
+                                      "files/" + self.message_filepicker_result.text().split('.')[0] + ".key",
+                                      "files/" + self.message_filepicker_result.text().split('.')[0] + ".bin")
+            print "FILES MADE"
+            # self.privatekey_sender =
+            # encipher.encipher(self.message_path, self.)
+
+    def generate_keys(self):
+
+        keyPair = RSA.generate(1024)
+
+        # For PrivateKey Generation
+
+        f = open("files/priKeyA.pem", "w")
+        f.write(keyPair.exportKey("PEM", "Basic Security_A"))
+        f.close()
+
+        # For PublicKey Generation
+
+        f = open("files/pubKeyA.pem", "w")
+        f.write(str(keyPair.publickey().exportKey()))
+        f.close()
+
+        keyPair = RSA.generate(1024)
+
+        f = open("files/priKeyB.pem", "w")
+        f.write(keyPair.exportKey("PEM", "Basic Security_B"))
+        f.close()
+
+        f = open("files/pubKeyB.pem", "w")
+        f.write(str(keyPair.publickey().exportKey()))
+        f.close()
 
 
 if __name__ == "__main__":
