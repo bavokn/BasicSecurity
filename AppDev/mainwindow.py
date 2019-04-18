@@ -39,8 +39,8 @@ class Enchipher:
         keySigner = PKCS1_v1_5.new(keyPair)
 
         # Saving signature to *.sig file
-
-        f = open(f_name.split('.')[0] + ".sig", "w")
+        relative = f_name.split('/')[-1]
+        f = open("files/" + relative.split('.')[0] + ".sig", "w+")
         f.write(keySigner.sign(h))
         f.close()
 
@@ -55,8 +55,8 @@ class Enchipher:
         keyCipher = PKCS1_OAEP.new(keyPair.publickey())
 
         # Saving encrypted key to *.key file
-
-        f = open(f_name.split('.')[0] + ".key", "w")
+        relative = f_name.split('/')[-1]
+        f = open("files/" + relative.split('.')[0] + ".key", "w+")
         f.write(iv + keyCipher.encrypt(h.digest()))
         f.close()
 
@@ -87,7 +87,8 @@ class Enchipher:
         # Encrypting and saving result to *.bin file. Using CFB mode
 
         keyCipher = AES.new(str(k), AES.MODE_CFB, iv)
-        f = open(f_name.split('.')[0] + ".bin", "wb")
+        relative = f_name.split('/')[-1]
+        f = open("files/" + relative.split('.')[0] + ".bin", "w+")
         f.write(keyCipher.encrypt(buffer))
         f.close()
 
@@ -106,9 +107,7 @@ class Enchipher:
 
         f.close()
 
-        # Running clean up to the bin, sig and key files
-
-        self.cleanUp(sig, key, bin)
+        # NOT Running clean up to the bin, sig and key files
 
     def cleanUp(self, sig, key, bin):
         # Deleting each of the files generated during ciphering
@@ -128,16 +127,16 @@ class Enchipher:
 
         else:
             s = f_name.split('.')[0]
-            if os.path.isfile(s + ".sig") and not os.access(s + ".sig", os.W_OK):
+            if os.path.isfile("files/" + s + ".sig") and not os.access(s + ".sig", os.W_OK):
                 print "Can't create temporary file: *.bin. Aborting..."
                 sys.exit(2)
-            if os.path.isfile(s + ".key") and not os.access(s + ".key", os.W_OK):
+            if os.path.isfile("files/" + s + ".key") and not os.access(s + ".key", os.W_OK):
                 print "Can't create temporary file: *.key. Aborting..."
                 sys.exit(3)
-            if os.path.isfile(s + ".bin") and not os.access(s + ".bin", os.W_OK):
+            if os.path.isfile("files/" + s + ".bin") and not os.access(s + ".bin", os.W_OK):
                 print "Can't create temporary file: *.bin. Aborting..."
                 sys.exit(4)
-            if os.path.isfile(s + ".all") and not os.access(s + ".all", os.W_OK):
+            if os.path.isfile("files/" + s + ".all") and not os.access(s + ".all", os.W_OK):
                 print "Can't create output file. Aborting..."
                 sys.exit(5)
 
@@ -162,7 +161,9 @@ class Decipher:
         self.priKey = "files/priKeyB.pem"
 
         # File name to decrypt
-        self.f_name = "files/encrypted_message.txt"
+        self.f_name = ""
+
+        self.is_authentic = False
 
     def sigVerification(self, pubKey_fname, f_name):
         # Generating decrypted file's SHA-256
@@ -179,6 +180,7 @@ class Decipher:
 
         if keyVerifier.verify(h, open(f_name.split('.')[0] + ".sig", "r").read()):
             print("The signature is authentic.")
+            self.is_authentic = True
             print("SHA-256 -> %s" % h.hexdigest())
         else:
             print("The signature is not authentic.")
@@ -193,6 +195,8 @@ class Decipher:
 
         f = open(f_name.split('.')[0] + ".key", "r")
         iv = f.read(16)
+
+        print privKey_fname, "\n", f_name
         k = keyDecipher.decrypt(f.read())
 
         return k, iv
@@ -585,41 +589,48 @@ class Ui_MainWindow(object):
 
     # EXECUTE ENCRYPTION OR DECRYPTION
     def execution(self):
-        print "HA"
-        print self.message_filepicker_result.text(), self.message_path
         if self.mode == 1:
             self.encipher.encipher('files/priKeyA.pem', 'files/pubKeyB.pem', self.message_path)
-            print "OK"
             self.encipher.auxFilesZip("files/" + self.message_filepicker_result.text().split('.')[0] + ".sig",
                                       "files/" + self.message_filepicker_result.text().split('.')[0] + ".key",
                                       "files/" + self.message_filepicker_result.text().split('.')[0] + ".bin")
-            print "FILES MADE"
-            # self.privatekey_sender =
-            # encipher.encipher(self.message_path, self.)
+            print "MESSAGE ENCRYPTED"
+        elif self.mode == 2:
+            fileName = self.encrypted_msg_path.split('.')[0]
+            print fileName
+            self.decipher.checkFiles(fileName, self.publickey_path, self.privatekey_path, False)
+            self.decipher.decipher(self.publickey_path, self.privatekey_path, fileName)
+            self.decipher.cleanUp(fileName + ".sig", fileName + ".key", fileName + ".bin", fileName + ".all")
+            print "MESSAGE DECRYPTED"
+            f = open(fileName).read()
+            self.textedit_io.setText(f)
+            if self.decipher.is_authentic:
+                self.label_hashchecker.setText("HASHCHECK OK")
 
+    # GENERATE KEY PAIRS FOR SENDER AND RECEIVER
     def generate_keys(self):
 
         keyPair = RSA.generate(1024)
 
         # For PrivateKey Generation
 
-        f = open("files/priKeyA.pem", "w")
-        f.write(keyPair.exportKey("PEM", "Basic Security_A"))
+        f = open("files/priKeyA.pem", "wb")
+        f.write(keyPair.exportKey("PEM"))
         f.close()
 
         # For PublicKey Generation
 
-        f = open("files/pubKeyA.pem", "w")
+        f = open("files/pubKeyA.pem", "wb")
         f.write(str(keyPair.publickey().exportKey()))
         f.close()
 
         keyPair = RSA.generate(1024)
 
-        f = open("files/priKeyB.pem", "w")
-        f.write(keyPair.exportKey("PEM", "Basic Security_B"))
+        f = open("files/priKeyB.pem", "wb")
+        f.write(keyPair.exportKey("PEM"))
         f.close()
 
-        f = open("files/pubKeyB.pem", "w")
+        f = open("files/pubKeyB.pem", "wb")
         f.write(str(keyPair.publickey().exportKey()))
         f.close()
 
