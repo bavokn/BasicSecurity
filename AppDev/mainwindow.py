@@ -15,9 +15,9 @@ from Crypto.Random import random
 class Enchipher:
     def __init__(self):
         # Sender's private key:
-        self.priKey = "files/priKeyA.pem"
+        self.priKey = "files/priKeySender.pem"
         # Receiver's public key:
-        self.pubKey = "files/pubKeyB.pem"
+        self.pubKey = "files/pubKeyReceiver.pem"
 
         # File name to encrypt
         self.f_name = ""
@@ -158,9 +158,9 @@ class Enchipher:
 class Decipher:
     def __init__(self):
         # Define public and private key names for faster usage
-        self.pubKey = "files/pubKeyA.pem"
+        self.pubKey = "files/pubKeySender.pem"
         # Receiver's private key:
-        self.priKey = "files/priKeyB.pem"
+        self.priKey = "files/priKeyReceiver.pem"
 
         # File name to decrypt
         self.f_name = ""
@@ -184,8 +184,10 @@ class Decipher:
             print("The signature is authentic.")
             self.is_authentic = True
             print("SHA-256 -> %s" % h.hexdigest())
+            return True
         else:
             print("The signature is not authentic.")
+            return False
 
     def keyReader(self, privKey_fname, f_name):
         # Reading private key to decipher symmetric key used
@@ -218,13 +220,19 @@ class Decipher:
 
             keyDecipher = AES.new(k, AES.MODE_CFB, iv)
             bin = open(f_name + ".bin", "rb").read()
+            print "Decipher output: " + str(f_name)
             f = open(f_name.split('.')[0], "wb")
             f.write(keyDecipher.decrypt(bin))
             f.close()
 
             # Running a Signature verification
 
-            self.sigVerification(keyA_fname, f_name.split('.')[0])
+            sig_verified = self.sigVerification(keyA_fname, f_name.split('.')[0])
+
+            if sig_verified is False:
+                return "sig_false"
+            else:
+                return "success"
         else:
             return iv
 
@@ -299,7 +307,8 @@ class Ui_MainWindow(object):
         # generate the keys
         self.generate_keys()
 
-        self._translate = QtCore.QCoreApplication.translate  # for translation   (whatever that is)
+        # for translation (used for setting text content for elements)
+        self._translate = QtCore.QCoreApplication.translate
 
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(914, 520)
@@ -338,12 +347,12 @@ class Ui_MainWindow(object):
         self.radioButton_encrypt = QtWidgets.QRadioButton(self.centralWidget)
         self.radioButton_encrypt.setGeometry(QtCore.QRect(350, 30, 112, 23))
         self.radioButton_encrypt.setObjectName("radioButton")
-        self.radioButton_encrypt.setEnabled(False)
+        self.radioButton_encrypt.setEnabled(True)
         self.radioButton_encrypt.clicked.connect(lambda: self.switch_mode())  # switch to encryption layout
 
         self.radioButton_decrypt = QtWidgets.QRadioButton(self.centralWidget)
         self.radioButton_decrypt.setGeometry(QtCore.QRect(490, 30, 112, 23))
-        self.radioButton_decrypt.setChecked(True)
+        self.radioButton_decrypt.setChecked(False)
         self.radioButton_decrypt.setObjectName("radioButton_2")
         self.radioButton_decrypt.clicked.connect(lambda: self.switch_mode())  # switch to decryption layout
 
@@ -370,7 +379,7 @@ class Ui_MainWindow(object):
         # ENCRYPTED MESSAGE
 
         self.label_encryptedmessage_fp = QtWidgets.QLabel(self.centralWidget)
-        self.label_encryptedmessage_fp.setGeometry(QtCore.QRect(50, 110, 151, 16))
+        self.label_encryptedmessage_fp.setGeometry(QtCore.QRect(50, 110, 170, 16))
         self.label_encryptedmessage_fp.setObjectName("label_3")
 
         self.encrypted_msg_filepicker_result = QtWidgets.QLineEdit(self.centralWidget)  # message filepicker
@@ -387,7 +396,7 @@ class Ui_MainWindow(object):
         # ENCRYPTED KEY
 
         self.label_encryptedkey_fp = QtWidgets.QLabel(self.centralWidget)
-        self.label_encryptedkey_fp.setGeometry(QtCore.QRect(50, 160, 111, 16))
+        self.label_encryptedkey_fp.setGeometry(QtCore.QRect(50, 160, 170, 16))
         self.label_encryptedkey_fp.setObjectName("label_4")
 
         self.encrypted_key_filepicker_result = QtWidgets.QLineEdit(self.centralWidget)
@@ -404,7 +413,7 @@ class Ui_MainWindow(object):
         # ENCRYPTED HASH
 
         self.label_encryptedhash_fp = QtWidgets.QLabel(self.centralWidget)
-        self.label_encryptedhash_fp.setGeometry(QtCore.QRect(50, 210, 111, 16))
+        self.label_encryptedhash_fp.setGeometry(QtCore.QRect(50, 210, 170, 16))
         self.label_encryptedhash_fp.setObjectName("label_5")
 
         self.encrypted_hash_filepicker_result = QtWidgets.QLineEdit(self.centralWidget)
@@ -421,7 +430,7 @@ class Ui_MainWindow(object):
         # PUBLIC KEY
 
         self.label_publickey_fp = QtWidgets.QLabel(self.centralWidget)
-        self.label_publickey_fp.setGeometry(QtCore.QRect(50, 260, 81, 16))
+        self.label_publickey_fp.setGeometry(QtCore.QRect(50, 260, 140, 16))
         self.label_publickey_fp.setObjectName("label_6")
 
         self.publickey_filepicker_result = QtWidgets.QLineEdit(self.centralWidget)
@@ -438,7 +447,7 @@ class Ui_MainWindow(object):
         # PRIVATE KEY
 
         self.label_privatekey_fp = QtWidgets.QLabel(self.centralWidget)
-        self.label_privatekey_fp.setGeometry(QtCore.QRect(50, 310, 81, 16))
+        self.label_privatekey_fp.setGeometry(QtCore.QRect(50, 310, 140, 16))
         self.label_privatekey_fp.setObjectName("label_7")
 
         self.privatekey_filepicker_result = QtWidgets.QLineEdit(self.centralWidget)
@@ -473,8 +482,8 @@ class Ui_MainWindow(object):
         self.label_encryptedmessage_fp.setText(self._translate("MainWindow", "Encrypted message (.bin)"))
         self.label_encryptedkey_fp.setText(self._translate("MainWindow", "Encrypted key (.key)"))
         self.label_encryptedhash_fp.setText(self._translate("MainWindow", "Encrypted hash (.sig)"))
-        self.label_publickey_fp.setText(self._translate("MainWindow", "Public key"))
-        self.label_privatekey_fp.setText(self._translate("MainWindow", "Private key"))
+        self.label_publickey_fp.setText(self._translate("MainWindow", "Public key sender"))
+        self.label_privatekey_fp.setText(self._translate("MainWindow", "Private key receiver"))
         self.label_hashchecker.setText(self._translate("MainWindow", "Hashcheck ..."))
 
     def switch_mode(self):
@@ -487,6 +496,7 @@ class Ui_MainWindow(object):
             self.radioButton_encrypt.setEnabled(False)
             self.radioButton_decrypt.setEnabled(True)
 
+            self.label_hashchecker.hide()
             self.label_io.setText(self._translate("MainWindow", "INPUT"))
             self.button_execute.setText(self._translate("MainWindow", "ENCRYPT"))
             self.label_encryptedmessage_fp.hide()
@@ -515,6 +525,7 @@ class Ui_MainWindow(object):
             self.radioButton_decrypt.setEnabled(False)
             self.radioButton_encrypt.setEnabled(True)
 
+            self.label_hashchecker.show()
             self.label_io.setText(self._translate("MainWindow", "OUTPUT"))
             self.button_execute.setText(self._translate("MainWindow", "DECRYPT"))
             self.label_encryptedmessage_fp.show()
@@ -603,28 +614,39 @@ class Ui_MainWindow(object):
 
     # EXECUTE ENCRYPTION OR DECRYPTION
     def execution(self):
+
         if self.mode == 1:
-            self.encipher.encipher('files/priKeyA.pem', 'files/pubKeyB.pem', self.message_path)
+            self.encipher.encipher('files/priKeySender.pem', 'files/pubKeyReceiver.pem', self.message_path)
             self.encipher.auxFilesZip("files/" + self.message_filepicker_result.text().split('.')[0] + ".sig",
                                       "files/" + self.message_filepicker_result.text().split('.')[0] + ".key",
                                       "files/" + self.message_filepicker_result.text().split('.')[0] + ".bin")
             print "MESSAGE ENCRYPTED"
+
         elif self.mode == 2:
             fileName = self.encrypted_msg_path.split('.')[0]
-            print fileName
+            print "Filename: " + fileName
             check_files_result = self.decipher.checkFiles(fileName, self.publickey_path, self.privatekey_path, False)
+            print "Check_files_result: " + str(check_files_result)
+
             if check_files_result == 1:
                 decipher_result = self.decipher.decipher(self.publickey_path, self.privatekey_path, fileName)
-                print decipher_result
-                if decipher_result is None:
+                print "Decipher result: " + str(decipher_result)
+
+                if decipher_result == 'success':
                     self.decipher.cleanUp(fileName + ".sig", fileName + ".key", fileName + ".bin", fileName + ".all")
                     print "MESSAGE DECRYPTED"
                     f = open(fileName).read()
                     self.textedit_io.setText(f)
                     if self.decipher.is_authentic:
                         self.label_hashchecker.setText("HASHCHECK OK")
+
+                elif decipher_result == 'sig_false':
+                    self.textedit_io.setText('The signature is not authentic.')
+                    self.label_hashchecker.setText("HASHCHECK NOT OK")
+
                 else:
                     self.textedit_io.setText(decipher_result)
+
             else:
                 self.textedit_io.setText(check_files_result)
 
@@ -635,23 +657,23 @@ class Ui_MainWindow(object):
 
         # For PrivateKey Generation
 
-        f = open("files/priKeyA.pem", "wb")
+        f = open("files/priKeySender.pem", "wb")
         f.write(keyPair.exportKey("PEM"))
         f.close()
 
         # For PublicKey Generation
 
-        f = open("files/pubKeyA.pem", "wb")
+        f = open("files/pubKeySender.pem", "wb")
         f.write(str(keyPair.publickey().exportKey()))
         f.close()
 
         keyPair = RSA.generate(1024)
 
-        f = open("files/priKeyB.pem", "wb")
+        f = open("files/priKeyReceiver.pem", "wb")
         f.write(keyPair.exportKey("PEM"))
         f.close()
 
-        f = open("files/pubKeyB.pem", "wb")
+        f = open("files/pubKeyReceiver.pem", "wb")
         f.write(str(keyPair.publickey().exportKey()))
         f.close()
 
