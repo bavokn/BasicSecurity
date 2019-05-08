@@ -121,7 +121,7 @@ class Enchipher:
 
         if not os.path.isfile(f_name) or not os.access(f_name, os.R_OK):
             print ("Invalid file to encrypt. Aborting...")
-            sys.exit(1)
+            return "Invalid file to encrypt."
 
         # Checking for each of the files to create existence and, in case they exist, if they are writable
 
@@ -129,28 +129,30 @@ class Enchipher:
             s = f_name.split('.')[0]
             if os.path.isfile("files/" + s + ".sig") and not os.access(s + ".sig", os.W_OK):
                 print "Can't create temporary file: *.bin. Aborting..."
-                sys.exit(2)
+                return "Can't create temporary file: *.bin."
             if os.path.isfile("files/" + s + ".key") and not os.access(s + ".key", os.W_OK):
                 print "Can't create temporary file: *.key. Aborting..."
-                sys.exit(3)
+                return "Can't create temporary file: *.key."
             if os.path.isfile("files/" + s + ".bin") and not os.access(s + ".bin", os.W_OK):
                 print "Can't create temporary file: *.bin. Aborting..."
-                sys.exit(4)
+                return "Can't create temporary file: *.bin."
             if os.path.isfile("files/" + s + ".all") and not os.access(s + ".all", os.W_OK):
                 print "Can't create output file. Aborting..."
-                sys.exit(5)
+                return "Can't create output file."
 
         # Checking for public key's existence and access
 
         if not os.path.isfile(pubKey) or not os.access(pubKey, os.R_OK):
             print "Invalid public key file. Aborting..."
-            sys.exit(6)
+            return "Invalid public key file."
 
         # Checking for private key's existence and access
 
         if not os.path.isfile(priKey) or not os.access(priKey, os.R_OK):
             print "Invalid private key file. Aborting..."
-            sys.exit(7)
+            return "Invalid private key file."
+
+        return 1
 
 
 class Decipher:
@@ -197,7 +199,12 @@ class Decipher:
         iv = f.read(16)
 
         print privKey_fname, "\n", f_name
-        k = keyDecipher.decrypt(f.read())
+        try:
+            k = keyDecipher.decrypt(f.read())
+        except TypeError:
+            return 0, "Invalid key."
+        except ValueError:
+            return 0, "Invalid key."
 
         return k, iv
 
@@ -206,17 +213,20 @@ class Decipher:
 
         k, iv = self.keyReader(keyB_fname, f_name)
 
-        # Deciphering the initial information and saving it to file with no extension
+        if k != 0:
+            # Deciphering the initial information and saving it to file with no extension
 
-        keyDecipher = AES.new(k, AES.MODE_CFB, iv)
-        bin = open(f_name + ".bin", "rb").read()
-        f = open(f_name.split('.')[0], "wb")
-        f.write(keyDecipher.decrypt(bin))
-        f.close()
+            keyDecipher = AES.new(k, AES.MODE_CFB, iv)
+            bin = open(f_name + ".bin", "rb").read()
+            f = open(f_name.split('.')[0], "wb")
+            f.write(keyDecipher.decrypt(bin))
+            f.close()
 
-        # Running a Signature verification
+            # Running a Signature verification
 
-        self.sigVerification(keyA_fname, f_name.split('.')[0])
+            self.sigVerification(keyA_fname, f_name.split('.')[0])
+        else:
+            return iv
 
     def auxFilesUnzip(self, all):
         # Opening the input file
@@ -243,38 +253,40 @@ class Decipher:
 
             if not os.path.isfile(f_name + ".all") or not os.access(f_name + ".all", os.R_OK):
                 print("Invalid file to decrypt. Aborting...")
-                sys.exit(1)
+                return "Invalid file to decrypt."
 
             # Checking for public key's existence and access
 
             if not os.path.isfile(pubKey) or not os.access(pubKey, os.R_OK):
                 print("Invalid public key file. Aborting...")
-                sys.exit(6)
+                return "Invalid public key file."
 
             # Checking for private key's existence and access
 
             if not os.path.isfile(priKey) or not os.access(priKey, os.R_OK):
                 print("Invalid private key file. Aborting...")
-                sys.exit(7)
+                return "Invalid private key file."
 
         elif not first_run:
             # Checking if all of the necessary files exist and are accessible
 
             if not os.path.isfile(f_name + ".sig") or not os.access(f_name + ".sig", os.R_OK):
                 print("Invalid *.sig file. Aborting...")
-                sys.exit(2)
+                return "Invalid *.sig file."
             if not os.path.isfile(f_name + ".key") or not os.access(f_name + ".key", os.R_OK):
                 print("Invalid *.key file. Aborting...")
-                sys.exit(3)
+                return "Invalid *.key file."
             if not os.path.isfile(f_name + ".bin") or not os.access(f_name + ".bin", os.R_OK):
                 print("Invalid *.bin file. Aborting...")
-                sys.exit(4)
+                return "Invalid *.bin file."
 
             # Checking if in case of output file's existence, it is writable
 
             if os.path.isfile(f_name) and not os.access(f_name, os.W_OK):
                 print("Can't create output file. Aborting...")
-                sys.exit(5)
+                return "Can't create output file."
+
+        return 1
 
 
 class Ui_MainWindow(object):
@@ -304,7 +316,8 @@ class Ui_MainWindow(object):
         self.button_execute.setObjectName("decryptButton")
         self.button_execute.clicked.connect(self.execution)
 
-        self.textedit_io = QtWidgets.QLineEdit(self.centralWidget)    # OUTPUT or INPUT field
+        # OUTPUT or INPUT field
+        self.textedit_io = QtWidgets.QLineEdit(self.centralWidget)
         self.textedit_io.setGeometry(QtCore.QRect(280, 100, 541, 321))
         self.textedit_io.setText("")
         self.textedit_io.setReadOnly(True)
@@ -312,7 +325,8 @@ class Ui_MainWindow(object):
         self.textedit_inputtext = ""
         self.textedit_outputtext = ""
 
-        self.label_io = QtWidgets.QLabel(self.centralWidget)    # INPUT or OUTPUT, depending on state
+        # INPUT or OUTPUT label, depending on state
+        self.label_io = QtWidgets.QLabel(self.centralWidget)
         self.label_io.setGeometry(QtCore.QRect(510, 60, 81, 31))
         font = QtGui.QFont()
         font.setPointSize(14)
@@ -351,7 +365,7 @@ class Ui_MainWindow(object):
         self.message_filepicker_button.setObjectName("filepicker_button")
         self.message_filepicker_button.clicked.connect(lambda: self.getfiles('msg_send'))
         self.message_filepicker_button.hide()
-        self.message_path = ""  # used to store path (idem for all others under this)
+        self.message_path = ""  # used to store path of file(idem for all others under this)
 
         # ENCRYPTED MESSAGE
 
@@ -368,7 +382,7 @@ class Ui_MainWindow(object):
         self.encrypted_msg_filepicker_button.setText("")
         self.encrypted_msg_filepicker_button.setObjectName("filepicker_button")
         self.encrypted_msg_filepicker_button.clicked.connect(lambda: self.getfiles('msg'))
-        self.encrypted_msg_path = ""  # used to store path (idem for all others under this)
+        self.encrypted_msg_path = ""  # used to store path of file (idem for all others under this)
 
         # ENCRYPTED KEY
 
@@ -456,9 +470,9 @@ class Ui_MainWindow(object):
         self.radioButton_encrypt.setText(self._translate("MainWindow", "ENCRYPT"))
         self.radioButton_decrypt.setText(self._translate("MainWindow", "DECRYPT"))
         self.label_message_fp.setText(self._translate("MainWindow", "Message"))
-        self.label_encryptedmessage_fp.setText(self._translate("MainWindow", "Encrypted message"))
-        self.label_encryptedkey_fp.setText(self._translate("MainWindow", "Encrypted key"))
-        self.label_encryptedhash_fp.setText(self._translate("MainWindow", "Encrypted hash"))
+        self.label_encryptedmessage_fp.setText(self._translate("MainWindow", "Encrypted message (.bin)"))
+        self.label_encryptedkey_fp.setText(self._translate("MainWindow", "Encrypted key (.key)"))
+        self.label_encryptedhash_fp.setText(self._translate("MainWindow", "Encrypted hash (.sig)"))
         self.label_publickey_fp.setText(self._translate("MainWindow", "Public key"))
         self.label_privatekey_fp.setText(self._translate("MainWindow", "Private key"))
         self.label_hashchecker.setText(self._translate("MainWindow", "Hashcheck ..."))
@@ -598,14 +612,21 @@ class Ui_MainWindow(object):
         elif self.mode == 2:
             fileName = self.encrypted_msg_path.split('.')[0]
             print fileName
-            self.decipher.checkFiles(fileName, self.publickey_path, self.privatekey_path, False)
-            self.decipher.decipher(self.publickey_path, self.privatekey_path, fileName)
-            self.decipher.cleanUp(fileName + ".sig", fileName + ".key", fileName + ".bin", fileName + ".all")
-            print "MESSAGE DECRYPTED"
-            f = open(fileName).read()
-            self.textedit_io.setText(f)
-            if self.decipher.is_authentic:
-                self.label_hashchecker.setText("HASHCHECK OK")
+            check_files_result = self.decipher.checkFiles(fileName, self.publickey_path, self.privatekey_path, False)
+            if check_files_result == 1:
+                decipher_result = self.decipher.decipher(self.publickey_path, self.privatekey_path, fileName)
+                print decipher_result
+                if decipher_result is None:
+                    self.decipher.cleanUp(fileName + ".sig", fileName + ".key", fileName + ".bin", fileName + ".all")
+                    print "MESSAGE DECRYPTED"
+                    f = open(fileName).read()
+                    self.textedit_io.setText(f)
+                    if self.decipher.is_authentic:
+                        self.label_hashchecker.setText("HASHCHECK OK")
+                else:
+                    self.textedit_io.setText(decipher_result)
+            else:
+                self.textedit_io.setText(check_files_result)
 
     # GENERATE KEY PAIRS FOR SENDER AND RECEIVER
     def generate_keys(self):
