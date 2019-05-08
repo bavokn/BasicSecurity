@@ -10,6 +10,7 @@ from Crypto.Signature import PKCS1_v1_5
 from PyQt5 import QtCore, QtGui, QtWidgets
 from Crypto import Random
 from Crypto.Random import random
+from PIL import Image
 
 
 class Enchipher:
@@ -154,6 +155,25 @@ class Enchipher:
 
         return 1
 
+    # STEGANOGRAPHY
+    def txt_encode(self, imp, text):
+        Im = Image.open(imp)
+
+        pixel = Im.load()
+        pixel[0, 0] = (len(text) % 256, (len(text) // 256) % 256, (len(text) // 65536))
+
+        for i in range(1, len(text) + 1):
+            k = list(pixel[0, i])
+            k[0] = int(k[0] / 10) * 10 + ord(text[i - 1]) // 100
+            k[1] = int(k[1] / 10) * 10 + ((ord(text[i - 1]) // 10) % 10)
+            k[2] = int(k[2] / 10) * 10 + ord(text[i - 1]) % 10
+            pixel[0, i] = tuple(k)
+
+        f_out_filename = str(imp).split('.')[0] + 'Encoded.png'
+        f_out_filename = 'files/' + str(f_out_filename).rsplit('/', 1)[1]
+        print f_out_filename
+        Im.save(f_out_filename)
+
 
 class Decipher:
     def __init__(self):
@@ -296,6 +316,21 @@ class Decipher:
 
         return 1
 
+    def txt_decode(self, imp):
+        imp = os.path.abspath(imp)
+        Im = Image.open(imp)
+        # Im=Im.convert('RGB')
+        pixels = Im.load()
+        size = (pixels[0, 0][0]) + (pixels[0, 0][1]) * 256 + (pixels[0, 0][2]) * 65536
+        t = []
+        for i in range(1, size + 1):
+            # print(pixels[0,i])
+            t.append(chr((pixels[0, i][0] % 10) * 100 + (pixels[0, i][1] % 10) * 10 + (pixels[0, i][2] % 10)))
+        print t
+        te = "".join(t)
+        print te
+        return te
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -375,6 +410,45 @@ class Ui_MainWindow(object):
         self.message_filepicker_button.clicked.connect(lambda: self.getfiles('msg_send'))
         self.message_filepicker_button.hide()
         self.message_path = ""  # used to store path of file(idem for all others under this)
+
+        # IMAGE FOR STEGANOGRAPHY (optional)
+
+        self.steganography = False
+        self.label_image_fp = QtWidgets.QLabel(self.centralWidget)
+        self.label_image_fp.setGeometry(QtCore.QRect(50, 160, 151, 16))
+        self.label_image_fp.setObjectName("label_image_fp")
+        self.label_image_fp.hide()
+
+        self.image_filepicker_result = QtWidgets.QLineEdit(self.centralWidget)  # image filepicker
+        self.image_filepicker_result.setGeometry(QtCore.QRect(50, 180, 171, 21))
+        self.image_filepicker_result.setReadOnly(True)
+        self.image_filepicker_result.setObjectName("image_filepicker_result")
+        self.image_filepicker_result.hide()
+        self.image_filepicker_button = QtWidgets.QPushButton(self.centralWidget)
+        self.image_filepicker_button.setGeometry(QtCore.QRect(200, 180, 21, 21))
+        self.image_filepicker_button.setText("")
+        self.image_filepicker_button.setObjectName("image_filepicker_button")
+        self.image_filepicker_button.clicked.connect(lambda: self.getfiles('image_send'))
+        self.image_filepicker_button.hide()
+        self.image_path = ""  # used to store path of file(idem for all others under this)
+
+        # ENCRYPTED IMAGE
+
+        self.label_encryptedimage_fp = QtWidgets.QLabel(self.centralWidget)
+        self.label_encryptedimage_fp.setGeometry(QtCore.QRect(50, 110, 170, 16))
+        self.label_encryptedimage_fp.setObjectName("encryptedimage_label")
+
+        self.encrypted_image_filepicker_result = QtWidgets.QLineEdit(self.centralWidget)  # message filepicker
+        self.encrypted_image_filepicker_result.setGeometry(QtCore.QRect(50, 130, 171, 21))
+        self.encrypted_image_filepicker_result.setReadOnly(True)
+        self.encrypted_image_filepicker_result.setObjectName("filepicker_result")
+
+        self.encrypted_image_filepicker_button = QtWidgets.QPushButton(self.centralWidget)
+        self.encrypted_image_filepicker_button.setGeometry(QtCore.QRect(200, 130, 21, 21))
+        self.encrypted_image_filepicker_button.setText("")
+        self.encrypted_image_filepicker_button.setObjectName("filepicker_button")
+        self.encrypted_image_filepicker_button.clicked.connect(lambda: self.getfiles('image_receive'))
+        self.encrypted_image_path = ""
 
         # ENCRYPTED MESSAGE
 
@@ -479,6 +553,8 @@ class Ui_MainWindow(object):
         self.radioButton_encrypt.setText(self._translate("MainWindow", "ENCRYPT"))
         self.radioButton_decrypt.setText(self._translate("MainWindow", "DECRYPT"))
         self.label_message_fp.setText(self._translate("MainWindow", "Message"))
+        self.label_image_fp.setText(self._translate("MainWindow", "Image (optional)"))
+        self.label_encryptedimage_fp.setText(self._translate("MainWindow", "Encrypted image (.png)"))
         self.label_encryptedmessage_fp.setText(self._translate("MainWindow", "Encrypted message (.bin)"))
         self.label_encryptedkey_fp.setText(self._translate("MainWindow", "Encrypted key (.key)"))
         self.label_encryptedhash_fp.setText(self._translate("MainWindow", "Encrypted hash (.sig)"))
@@ -514,10 +590,16 @@ class Ui_MainWindow(object):
             self.privatekey_filepicker_button.hide()
             self.publickey_filepicker_result.hide()
             self.publickey_filepicker_button.hide()
+            self.label_encryptedimage_fp.hide()
+            self.encrypted_image_filepicker_button.hide()
+            self.encrypted_image_filepicker_result.hide()
 
             self.message_filepicker_button.show()
             self.message_filepicker_result.show()
             self.label_message_fp.show()
+            self.image_filepicker_button.show()
+            self.image_filepicker_result.show()
+            self.label_image_fp.show()
 
             self.textedit_io.setText(self.textedit_inputtext)
 
@@ -525,28 +607,37 @@ class Ui_MainWindow(object):
             self.radioButton_decrypt.setEnabled(False)
             self.radioButton_encrypt.setEnabled(True)
 
-            self.label_hashchecker.show()
             self.label_io.setText(self._translate("MainWindow", "OUTPUT"))
             self.button_execute.setText(self._translate("MainWindow", "DECRYPT"))
-            self.label_encryptedmessage_fp.show()
-            self.label_encryptedkey_fp.show()
-            self.label_encryptedhash_fp.show()
-            self.label_publickey_fp.show()
-            self.label_privatekey_fp.show()
-            self.encrypted_hash_filepicker_result.show()
-            self.encrypted_hash_filepicker_button.show()
-            self.encrypted_key_filepicker_button.show()
-            self.encrypted_key_filepicker_result.show()
-            self.encrypted_msg_filepicker_result.show()
-            self.encrypted_msg_filepicker_button.show()
-            self.privatekey_filepicker_result.show()
-            self.privatekey_filepicker_button.show()
-            self.publickey_filepicker_result.show()
-            self.publickey_filepicker_button.show()
+
+            if self.steganography:
+                self.label_encryptedimage_fp.show()
+                self.encrypted_image_filepicker_button.show()
+                self.encrypted_image_filepicker_result.show()
+            else:
+                self.label_hashchecker.show()
+                self.label_encryptedmessage_fp.show()
+                self.label_encryptedkey_fp.show()
+                self.label_encryptedhash_fp.show()
+                self.label_publickey_fp.show()
+                self.label_privatekey_fp.show()
+                self.encrypted_hash_filepicker_result.show()
+                self.encrypted_hash_filepicker_button.show()
+                self.encrypted_key_filepicker_button.show()
+                self.encrypted_key_filepicker_result.show()
+                self.encrypted_msg_filepicker_result.show()
+                self.encrypted_msg_filepicker_button.show()
+                self.privatekey_filepicker_result.show()
+                self.privatekey_filepicker_button.show()
+                self.publickey_filepicker_result.show()
+                self.publickey_filepicker_button.show()
 
             self.message_filepicker_button.hide()
             self.message_filepicker_result.hide()
             self.label_message_fp.hide()
+            self.image_filepicker_button.hide()
+            self.image_filepicker_result.hide()
+            self.label_image_fp.hide()
 
             self.textedit_inputtext = self.textedit_io.text()
             self.textedit_io.setText(self.textedit_outputtext)
@@ -554,9 +645,6 @@ class Ui_MainWindow(object):
         self.button_active_check()
 
     def getfiles(self, type):
-        """dlg = QtWidgets.QFileDialog()
-        dlg.setFileMode(QtWidgets.QFileDialog.AnyFile)
-        dlg.setFilter("Text files (*.txt)")"""
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         fileName, _ = QtWidgets.QFileDialog.getOpenFileName(None, "QFileDialog.getOpenFileName()", "",
@@ -579,6 +667,21 @@ class Ui_MainWindow(object):
                 f = open(fileName, 'r')
                 input_msg = f.read()
                 self.textedit_io.setText(input_msg)
+            elif type == 'image_send':
+                if str(fileName).split('.')[1].upper() in ['PPM', 'PNG', 'JPEG', 'GIF', 'TIFF', 'BMP']:
+                    self.steganography = True
+                    self.image_filepicker_result.setText(result)
+                    self.image_path = fileName
+                    if len(self.textedit_inputtext) > 0:
+                        self.textedit_io.setText(self.textedit_inputtext)
+                else:
+                    self.textedit_io.setText('Image must be of type PPM, PNG, JPEG, GIF, TIFF or BMP')
+            elif type == 'image_receive':
+                if str(fileName).split('.')[1].upper() == 'PNG':
+                    self.encrypted_image_filepicker_result.setText(result)
+                    self.encrypted_image_path = fileName
+                else:
+                    self.textedit_io.setText('Image must be of type PNG')
             elif type == 'key':
                 self.encrypted_key_filepicker_result.setText(result)
                 self.encrypted_key_path = fileName
@@ -603,7 +706,7 @@ class Ui_MainWindow(object):
                 self.button_execute.setEnabled(False)
         elif self.mode == 2:
             if not (self.encrypted_msg_path == '' or self.encrypted_key_path == '' or self.encrypted_hash_path == ''
-                    or self.publickey_path == '' or self.privatekey_path == ''):
+                    or self.publickey_path == '' or self.privatekey_path == '') or not self.encrypted_image_path == '':
                 self.button_execute.setEnabled(True)
             else:
                 self.button_execute.setEnabled(False)
@@ -616,39 +719,49 @@ class Ui_MainWindow(object):
     def execution(self):
 
         if self.mode == 1:
-            self.encipher.encipher('files/priKeySender.pem', 'files/pubKeyReceiver.pem', self.message_path)
-            self.encipher.auxFilesZip("files/" + self.message_filepicker_result.text().split('.')[0] + ".sig",
-                                      "files/" + self.message_filepicker_result.text().split('.')[0] + ".key",
-                                      "files/" + self.message_filepicker_result.text().split('.')[0] + ".bin")
+            if self.steganography:
+                self.encipher.txt_encode(self.image_path, self.textedit_inputtext)
+            else:
+                self.encipher.encipher('files/priKeySender.pem', 'files/pubKeyReceiver.pem', self.message_path)
+                self.encipher.auxFilesZip("files/" + self.message_filepicker_result.text().split('.')[0] + ".sig",
+                                          "files/" + self.message_filepicker_result.text().split('.')[0] + ".key",
+                                          "files/" + self.message_filepicker_result.text().split('.')[0] + ".bin")
             print "MESSAGE ENCRYPTED"
 
         elif self.mode == 2:
-            fileName = self.encrypted_msg_path.split('.')[0]
-            print "Filename: " + fileName
-            check_files_result = self.decipher.checkFiles(fileName, self.publickey_path, self.privatekey_path, False)
-            print "Check_files_result: " + str(check_files_result)
+            print self.steganography
 
-            if check_files_result == 1:
-                decipher_result = self.decipher.decipher(self.publickey_path, self.privatekey_path, fileName)
-                print "Decipher result: " + str(decipher_result)
+            if self.steganography:
+                text = self.decipher.txt_decode(self.encrypted_image_path)
+                print 'Returned text: ' + text
+                self.textedit_io.setText(text)
+            else:
+                fileName = self.encrypted_msg_path.split('.')[0]
+                print "Filename: " + fileName
+                check_files_result = self.decipher.checkFiles(fileName, self.publickey_path, self.privatekey_path, False)
+                print "Check_files_result: " + str(check_files_result)
 
-                if decipher_result == 'success':
-                    self.decipher.cleanUp(fileName + ".sig", fileName + ".key", fileName + ".bin", fileName + ".all")
-                    print "MESSAGE DECRYPTED"
-                    f = open(fileName).read()
-                    self.textedit_io.setText(f)
-                    if self.decipher.is_authentic:
-                        self.label_hashchecker.setText("HASHCHECK OK")
+                if check_files_result == 1:
+                    decipher_result = self.decipher.decipher(self.publickey_path, self.privatekey_path, fileName)
+                    print "Decipher result: " + str(decipher_result)
 
-                elif decipher_result == 'sig_false':
-                    self.textedit_io.setText('The signature is not authentic.')
-                    self.label_hashchecker.setText("HASHCHECK NOT OK")
+                    if decipher_result == 'success':
+                        self.decipher.cleanUp(fileName + ".sig", fileName + ".key", fileName + ".bin", fileName + ".all")
+                        print "MESSAGE DECRYPTED"
+                        f = open(fileName).read()
+                        self.textedit_io.setText(f)
+                        if self.decipher.is_authentic:
+                            self.label_hashchecker.setText("HASHCHECK OK")
+
+                    elif decipher_result == 'sig_false':
+                        self.textedit_io.setText('The signature is not authentic.')
+                        self.label_hashchecker.setText("HASHCHECK NOT OK")
+
+                    else:
+                        self.textedit_io.setText(decipher_result)
 
                 else:
-                    self.textedit_io.setText(decipher_result)
-
-            else:
-                self.textedit_io.setText(check_files_result)
+                    self.textedit_io.setText(check_files_result)
 
     # GENERATE KEY PAIRS FOR SENDER AND RECEIVER
     def generate_keys(self):
