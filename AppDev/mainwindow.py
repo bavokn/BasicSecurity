@@ -430,6 +430,12 @@ class Ui_MainWindow(object):
         self.image_filepicker_button.setObjectName("image_filepicker_button")
         self.image_filepicker_button.clicked.connect(lambda: self.getfiles('image_send'))
         self.image_filepicker_button.hide()
+        self.image_remove_button = QtWidgets.QPushButton(self.centralWidget)
+        self.image_remove_button.setGeometry(QtCore.QRect(223, 180, 21, 21))
+        self.image_remove_button.setText("X")
+        self.image_remove_button.setObjectName("image_filepicker_button")
+        self.image_remove_button.clicked.connect(lambda: self.remove_image())
+        self.image_remove_button.hide()
         self.image_path = ""  # used to store path of file(idem for all others under this)
 
         # ENCRYPTED IMAGE
@@ -600,6 +606,7 @@ class Ui_MainWindow(object):
             self.image_filepicker_button.show()
             self.image_filepicker_result.show()
             self.label_image_fp.show()
+            self.image_remove_button.show()
 
             self.textedit_io.setText(self.textedit_inputtext)
 
@@ -638,6 +645,7 @@ class Ui_MainWindow(object):
             self.image_filepicker_button.hide()
             self.image_filepicker_result.hide()
             self.label_image_fp.hide()
+            self.image_remove_button.hide()
 
             self.textedit_inputtext = self.textedit_io.text()
             self.textedit_io.setText(self.textedit_outputtext)
@@ -789,6 +797,11 @@ class Ui_MainWindow(object):
         f = open("files/pubKeyReceiver.pem", "wb")
         f.write(str(keyPair.publickey().exportKey()))
         f.close()
+
+    def remove_image(self):
+        self.steganography = False
+        self.image_path = ''
+        self.image_filepicker_result.setText('')
 
 
 if __name__ == "__main__":
