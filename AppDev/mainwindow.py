@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import os
+import os, shutil
 import sys
 import zipfile
 from Crypto.Cipher import PKCS1_OAEP, AES
@@ -363,7 +363,8 @@ class Ui_MainWindow(object):
         self.button_execute.clicked.connect(self.execution)
 
         # OUTPUT or INPUT field
-        self.textedit_io = QtWidgets.QLineEdit(self.centralWidget)
+        # self.textedit_io = QtWidgets.QLineEdit(self.centralWidget)
+        self.textedit_io = QtWidgets.QTextEdit(self.centralWidget)
         self.textedit_io.setGeometry(QtCore.QRect(280, 100, 541, 321))
         self.textedit_io.setText("")
         self.textedit_io.setReadOnly(True)
@@ -457,6 +458,18 @@ class Ui_MainWindow(object):
         self.encrypted_image_filepicker_button.setObjectName("filepicker_button")
         self.encrypted_image_filepicker_button.clicked.connect(lambda: self.getfiles('image_receive'))
         self.encrypted_image_path = ""
+
+        # FILES REMOVER BUTTON
+
+        self.remove_files_button = QtWidgets.QPushButton(self.centralWidget)
+        self.remove_files_button.setGeometry(QtCore.QRect(50, 220, 171, 21))
+        self.remove_files_button.setText('Remove Files')
+        self.remove_files_button.setObjectName('remove_files_button')
+        self.remove_files_button.clicked.connect(lambda: self.deleteFiles())
+
+        self.label_fileremover = QtWidgets.QLabel(self.centralWidget)
+        self.label_fileremover.setGeometry(QtCore.QRect(50, 250, 170, 16))
+        self.label_fileremover.setObjectName("fileremover_label")
 
         # ENCRYPTED MESSAGE
 
@@ -569,6 +582,7 @@ class Ui_MainWindow(object):
         self.label_publickey_fp.setText(self._translate("MainWindow", "Public key sender"))
         self.label_privatekey_fp.setText(self._translate("MainWindow", "Private key receiver"))
         self.label_hashchecker.setText(self._translate("MainWindow", "Hashcheck ..."))
+        self.label_fileremover.setText(self._translate("MainWindow", "Also regenerates keys."))
 
     def switch_mode(self):
         if self.radioButton_encrypt.isEnabled():
@@ -609,6 +623,8 @@ class Ui_MainWindow(object):
             self.image_filepicker_result.show()
             self.label_image_fp.show()
             self.image_remove_button.show()
+            self.remove_files_button.show()
+            self.label_fileremover.show()
 
             self.textedit_io.setText(self.textedit_inputtext)
 
@@ -648,8 +664,10 @@ class Ui_MainWindow(object):
             self.image_filepicker_result.hide()
             self.label_image_fp.hide()
             self.image_remove_button.hide()
+            self.remove_files_button.hide()
+            self.label_fileremover.hide()
 
-            self.textedit_inputtext = self.textedit_io.text()
+            self.textedit_inputtext = self.textedit_io.toPlainText()
             self.textedit_io.setText(self.textedit_outputtext)
 
         self.button_active_check()
@@ -707,6 +725,19 @@ class Ui_MainWindow(object):
 
         self.button_active_check()
 
+    def deleteFiles(self):
+        for the_file in os.listdir('files/'):
+            file_path = os.path.join('files/', the_file)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                print(self.textedit_io.setText('Error occurred while deleting files.'))
+
+        self.generate_keys()
+
     # CHECK IF BUTTON SHOULD BE ACTIVE
     def button_active_check(self):
         if self.mode == 1:
@@ -731,7 +762,7 @@ class Ui_MainWindow(object):
         self.label_hashchecker.setText('Hashcheck ...')
         if self.mode == 1:
             if self.steganography:
-                if not self.encipher.txt_encode(self.image_path, self.textedit_io.text()):
+                if not self.encipher.txt_encode(self.image_path, self.textedit_io.toPlainText()):
                     self.textedit_io.setText('Failed to encode. Message too long?')
             else:
                 self.encipher.encipher('files/priKeySender.pem', 'files/pubKeyReceiver.pem', self.message_path)
