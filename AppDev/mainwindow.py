@@ -156,23 +156,27 @@ class Enchipher:
         return 1
 
     # STEGANOGRAPHY
+
     def txt_encode(self, imp, text):
         Im = Image.open(imp)
 
         pixel = Im.load()
         pixel[0, 0] = (len(text) % 256, (len(text) // 256) % 256, (len(text) // 65536))
 
-        for i in range(1, len(text) + 1):
-            k = list(pixel[0, i])
-            k[0] = int(k[0] / 10) * 10 + ord(text[i - 1]) // 100
-            k[1] = int(k[1] / 10) * 10 + ((ord(text[i - 1]) // 10) % 10)
-            k[2] = int(k[2] / 10) * 10 + ord(text[i - 1]) % 10
-            pixel[0, i] = tuple(k)
+        try:
+            for i in range(1, len(text) + 1):
+                k = list(pixel[0, i])
+                k[0] = int(k[0] / 10) * 10 + ord(text[i - 1]) // 100
+                k[1] = int(k[1] / 10) * 10 + ((ord(text[i - 1]) // 10) % 10)
+                k[2] = int(k[2] / 10) * 10 + ord(text[i - 1]) % 10
+                pixel[0, i] = tuple(k)
+        except IndexError:
+            return False
 
         f_out_filename = str(imp).split('.')[0] + 'Encoded.png'
         f_out_filename = 'files/' + str(f_out_filename).rsplit('/', 1)[1]
-        print f_out_filename
         Im.save(f_out_filename)
+        return True
 
 
 class Decipher:
@@ -319,16 +323,14 @@ class Decipher:
     def txt_decode(self, imp):
         imp = os.path.abspath(imp)
         Im = Image.open(imp)
-        # Im=Im.convert('RGB')
         pixels = Im.load()
         size = (pixels[0, 0][0]) + (pixels[0, 0][1]) * 256 + (pixels[0, 0][2]) * 65536
         t = []
+
         for i in range(1, size + 1):
-            # print(pixels[0,i])
             t.append(chr((pixels[0, i][0] % 10) * 100 + (pixels[0, i][1] % 10) * 10 + (pixels[0, i][2] % 10)))
-        print t
+
         te = "".join(t)
-        print te
         return te
 
 
@@ -726,9 +728,11 @@ class Ui_MainWindow(object):
     # EXECUTE ENCRYPTION OR DECRYPTION
     def execution(self):
 
+        self.label_hashchecker.setText('Hashcheck ...')
         if self.mode == 1:
             if self.steganography:
-                self.encipher.txt_encode(self.image_path, self.textedit_inputtext)
+                if not self.encipher.txt_encode(self.image_path, self.textedit_io.text()):
+                    self.textedit_io.setText('Failed to encode. Message too long?')
             else:
                 self.encipher.encipher('files/priKeySender.pem', 'files/pubKeyReceiver.pem', self.message_path)
                 self.encipher.auxFilesZip("files/" + self.message_filepicker_result.text().split('.')[0] + ".sig",
