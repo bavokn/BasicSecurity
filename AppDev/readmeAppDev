@@ -1,1 +1,6 @@
-plaats hier enkel bestanden voor het deel van Appdev aub
+HOW TO RUN
+----------
+
+1. Open the AppDev directory in a terminal.
+2. Type "dist/mainwindow/mainwindow".
+3. Done.

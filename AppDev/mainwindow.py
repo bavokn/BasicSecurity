@@ -11,6 +11,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from Crypto import Random
 from Crypto.Random import random
 from PIL import Image
+from PyQt5.QtGui import QPixmap
 
 
 class Enchipher:
@@ -121,7 +122,6 @@ class Enchipher:
         # Checking for encrypting file's existence and access
 
         if not os.path.isfile(f_name) or not os.access(f_name, os.R_OK):
-            print ("Invalid file to encrypt. Aborting...")
             return "Invalid file to encrypt."
 
         # Checking for each of the files to create existence and, in case they exist, if they are writable
@@ -129,28 +129,22 @@ class Enchipher:
         else:
             s = f_name.split('.')[0]
             if os.path.isfile("files/" + s + ".sig") and not os.access(s + ".sig", os.W_OK):
-                print "Can't create temporary file: *.bin. Aborting..."
                 return "Can't create temporary file: *.bin."
             if os.path.isfile("files/" + s + ".key") and not os.access(s + ".key", os.W_OK):
-                print "Can't create temporary file: *.key. Aborting..."
                 return "Can't create temporary file: *.key."
             if os.path.isfile("files/" + s + ".bin") and not os.access(s + ".bin", os.W_OK):
-                print "Can't create temporary file: *.bin. Aborting..."
                 return "Can't create temporary file: *.bin."
             if os.path.isfile("files/" + s + ".all") and not os.access(s + ".all", os.W_OK):
-                print "Can't create output file. Aborting..."
                 return "Can't create output file."
 
         # Checking for public key's existence and access
 
         if not os.path.isfile(pubKey) or not os.access(pubKey, os.R_OK):
-            print "Invalid public key file. Aborting..."
             return "Invalid public key file."
 
         # Checking for private key's existence and access
 
         if not os.path.isfile(priKey) or not os.access(priKey, os.R_OK):
-            print "Invalid private key file. Aborting..."
             return "Invalid private key file."
 
         return 1
@@ -205,12 +199,9 @@ class Decipher:
         # If signature is right, prints SHA-256. Otherwise states that the file is not authentic
 
         if keyVerifier.verify(h, open(f_name.split('.')[0] + ".sig", "r").read()):
-            print("The signature is authentic.")
             self.is_authentic = True
-            print("SHA-256 -> %s" % h.hexdigest())
-            return True
+            return self.is_authentic
         else:
-            print("The signature is not authentic.")
             return False
 
     def keyReader(self, privKey_fname, f_name):
@@ -224,7 +215,6 @@ class Decipher:
         f = open(f_name.split('.')[0] + ".key", "r")
         iv = f.read(16)
 
-        print privKey_fname, "\n", f_name
         try:
             k = keyDecipher.decrypt(f.read())
         except TypeError:
@@ -244,7 +234,6 @@ class Decipher:
 
             keyDecipher = AES.new(k, AES.MODE_CFB, iv)
             bin = open(f_name + ".bin", "rb").read()
-            print "Decipher output: " + str(f_name)
             f = open(f_name.split('.')[0], "wb")
             f.write(keyDecipher.decrypt(bin))
             f.close()
@@ -284,38 +273,31 @@ class Decipher:
             # Checking for decrypting file's existence and access
 
             if not os.path.isfile(f_name + ".all") or not os.access(f_name + ".all", os.R_OK):
-                print("Invalid file to decrypt. Aborting...")
                 return "Invalid file to decrypt."
 
             # Checking for public key's existence and access
 
             if not os.path.isfile(pubKey) or not os.access(pubKey, os.R_OK):
-                print("Invalid public key file. Aborting...")
                 return "Invalid public key file."
 
             # Checking for private key's existence and access
 
             if not os.path.isfile(priKey) or not os.access(priKey, os.R_OK):
-                print("Invalid private key file. Aborting...")
                 return "Invalid private key file."
 
         elif not first_run:
             # Checking if all of the necessary files exist and are accessible
 
             if not os.path.isfile(f_name + ".sig") or not os.access(f_name + ".sig", os.R_OK):
-                print("Invalid *.sig file. Aborting...")
                 return "Invalid *.sig file."
             if not os.path.isfile(f_name + ".key") or not os.access(f_name + ".key", os.R_OK):
-                print("Invalid *.key file. Aborting...")
                 return "Invalid *.key file."
             if not os.path.isfile(f_name + ".bin") or not os.access(f_name + ".bin", os.R_OK):
-                print("Invalid *.bin file. Aborting...")
                 return "Invalid *.bin file."
 
             # Checking if in case of output file's existence, it is writable
 
             if os.path.isfile(f_name) and not os.access(f_name, os.W_OK):
-                print("Can't create output file. Aborting...")
                 return "Can't create output file."
 
         return 1
@@ -471,6 +453,18 @@ class Ui_MainWindow(object):
         self.label_fileremover.setGeometry(QtCore.QRect(50, 250, 170, 16))
         self.label_fileremover.setObjectName("fileremover_label")
 
+        # IMAGE PREVIEW LABEL
+
+        self.label_imagepreview_send = QtWidgets.QLabel(self.centralWidget)
+        self.label_imagepreview_send.setGeometry(QtCore.QRect(50, 275, 200, 128))
+        self.label_imagepreview_send.setObjectName("send_imagepreview_label")
+
+        # IMAGE PREVIEW LABEL
+
+        self.label_imagepreview_receive = QtWidgets.QLabel(self.centralWidget)
+        self.label_imagepreview_receive.setGeometry(QtCore.QRect(50, 275, 200, 128))
+        self.label_imagepreview_receive.setObjectName("receive_imagepreview_label")
+
         # ENCRYPTED MESSAGE
 
         self.label_encryptedmessage_fp = QtWidgets.QLabel(self.centralWidget)
@@ -556,9 +550,17 @@ class Ui_MainWindow(object):
         self.privatekey_filepicker_button.clicked.connect(lambda: self.getfiles('privatekey'))
         self.privatekey_path = ""
 
+        # HASHCHECK LABEL
+
         self.label_hashchecker = QtWidgets.QLabel(self.centralWidget)
         self.label_hashchecker.setGeometry(QtCore.QRect(420, 450, 161, 21))
         self.label_hashchecker.setObjectName("label_8")
+
+        # ENCRYPTION SUCCESS LABEL
+
+        self.label_encryptsuccess = QtWidgets.QLabel(self.centralWidget)
+        self.label_encryptsuccess.setGeometry(QtCore.QRect(420, 450, 161, 21))
+        self.label_encryptsuccess.setObjectName("encryptsuccess_label")
 
         # mainwindow setup
         MainWindow.setCentralWidget(self.centralWidget)
@@ -615,7 +617,10 @@ class Ui_MainWindow(object):
             self.label_encryptedimage_fp.hide()
             self.encrypted_image_filepicker_button.hide()
             self.encrypted_image_filepicker_result.hide()
+            self.label_imagepreview_receive.hide()
 
+            self.label_encryptsuccess.show()
+            self.label_imagepreview_send.show()
             self.message_filepicker_button.show()
             self.message_filepicker_result.show()
             self.label_message_fp.show()
@@ -639,6 +644,8 @@ class Ui_MainWindow(object):
                 self.label_encryptedimage_fp.show()
                 self.encrypted_image_filepicker_button.show()
                 self.encrypted_image_filepicker_result.show()
+                self.label_imagepreview_receive.show()
+
             else:
                 self.label_hashchecker.show()
                 self.label_encryptedmessage_fp.show()
@@ -657,6 +664,8 @@ class Ui_MainWindow(object):
                 self.publickey_filepicker_result.show()
                 self.publickey_filepicker_button.show()
 
+            self.label_encryptsuccess.hide()
+            self.label_imagepreview_send.hide()
             self.message_filepicker_button.hide()
             self.message_filepicker_result.hide()
             self.label_message_fp.hide()
@@ -695,6 +704,7 @@ class Ui_MainWindow(object):
                 f = open(fileName, 'r')
                 input_msg = f.read()
                 self.textedit_io.setText(input_msg)
+                self.label_encryptsuccess.setText("")
             elif type == 'image_send':
                 if str(fileName).split('.')[1].upper() in ['PPM', 'PNG', 'JPEG', 'GIF', 'TIFF', 'BMP']:
                     self.steganography = True
@@ -702,12 +712,20 @@ class Ui_MainWindow(object):
                     self.image_path = fileName
                     if len(self.textedit_inputtext) > 0:
                         self.textedit_io.setText(self.textedit_inputtext)
+
+                    scaled_pixmap = QPixmap(self.image_path).scaled(self.label_imagepreview_send.size(),
+                                                                     QtCore.Qt.KeepAspectRatio)
+                    self.label_imagepreview_send.setPixmap(scaled_pixmap)
                 else:
                     self.textedit_io.setText('Image must be of type PPM, PNG, JPEG, GIF, TIFF or BMP')
             elif type == 'image_receive':
                 if str(fileName).split('.')[1].upper() == 'PNG':
                     self.encrypted_image_filepicker_result.setText(result)
                     self.encrypted_image_path = fileName
+
+                    scaled_pixmap = QPixmap(self.encrypted_image_path).scaled(self.label_imagepreview_send.size(),
+                                                                              QtCore.Qt.KeepAspectRatio)
+                    self.label_imagepreview_receive.setPixmap(scaled_pixmap)
                 else:
                     self.textedit_io.setText('Image must be of type PNG')
             elif type == 'key':
@@ -734,7 +752,7 @@ class Ui_MainWindow(object):
                 elif os.path.isdir(file_path):
                     shutil.rmtree(file_path)
             except Exception as e:
-                print(self.textedit_io.setText('Error occurred while deleting files.'))
+                self.textedit_io.setText('Error occurred while deleting files.')
 
         self.generate_keys()
 
@@ -754,43 +772,44 @@ class Ui_MainWindow(object):
 
     def edit_text(self):
         self.textedit_inputtext = self.textedit_io.text()
-        print(self.textedit_inputtext)
 
     # EXECUTE ENCRYPTION OR DECRYPTION
     def execution(self):
 
         self.label_hashchecker.setText('Hashcheck ...')
+
         if self.mode == 1:
+
             if self.steganography:
-                if not self.encipher.txt_encode(self.image_path, self.textedit_io.toPlainText()):
+                if self.encipher.txt_encode(self.image_path, self.textedit_io.toPlainText()):
+                    self.label_encryptsuccess.setText("Message encrypted.")
+
+                else:
                     self.textedit_io.setText('Failed to encode. Message too long?')
+
             else:
                 self.encipher.encipher('files/priKeySender.pem', 'files/pubKeyReceiver.pem', self.message_path)
                 self.encipher.auxFilesZip("files/" + self.message_filepicker_result.text().split('.')[0] + ".sig",
                                           "files/" + self.message_filepicker_result.text().split('.')[0] + ".key",
                                           "files/" + self.message_filepicker_result.text().split('.')[0] + ".bin")
-            print "MESSAGE ENCRYPTED"
+                self.label_encryptsuccess.setText("Message encrypted.")
 
         elif self.mode == 2:
-            print self.steganography
 
             if self.steganography:
                 text = self.decipher.txt_decode(self.encrypted_image_path)
-                print 'Returned text: ' + text
                 self.textedit_io.setText(text)
+
             else:
+
                 fileName = self.encrypted_msg_path.split('.')[0]
-                print "Filename: " + fileName
                 check_files_result = self.decipher.checkFiles(fileName, self.publickey_path, self.privatekey_path, False)
-                print "Check_files_result: " + str(check_files_result)
 
                 if check_files_result == 1:
                     decipher_result = self.decipher.decipher(self.publickey_path, self.privatekey_path, fileName)
-                    print "Decipher result: " + str(decipher_result)
 
                     if decipher_result == 'success':
                         self.decipher.cleanUp(fileName + ".sig", fileName + ".key", fileName + ".bin", fileName + ".all")
-                        print "MESSAGE DECRYPTED"
                         f = open(fileName).read()
                         self.textedit_io.setText(f)
                         if self.decipher.is_authentic:
@@ -837,6 +856,8 @@ class Ui_MainWindow(object):
         self.steganography = False
         self.image_path = ''
         self.image_filepicker_result.setText('')
+        self.label_imagepreview_send.setPixmap(QPixmap())
+        self.label_encryptsuccess.setText("")
 
 
 if __name__ == "__main__":
